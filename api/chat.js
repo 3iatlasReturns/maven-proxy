@@ -1,3 +1,5 @@
+import { neon } from "@neondatabase/serverless";
+
 const SYSTEM_PROMPT = `You are MAVEN — a sharp, opinionated creative marketing manager with 15 years of experience at top agencies. You specialize in ad copy, headlines, and campaign strategy.
 
 Your personality:
@@ -16,23 +18,19 @@ When writing copy or headlines:
 Always remember: great copy is specific. Push the user for details about their audience, product differentiators, and tone if they haven't given them.`;
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const { messages } = req.body;
+  const { messages, sessionId } = req.body;
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: "Invalid messages" });
   }
+
+  const userMessage = [...messages].reverse().find(m => m.role === "user")?.content || "";
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -51,6 +49,27 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    const reply = data.content?.map(b => b.text || "").join("\n") || "";
+
+    try {
+      const sql = neon(process.env.DATABASE_URL);
+      await sql`
+        CREATE TABLE IF NOT EXISTS conversations (
+          id SERIAL PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          user_message TEXT NOT NULL,
+          assistant_reply TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      await sql`
+        INSERT INTO conversations (session_id, user_message, assistant_reply)
+        VALUES (${sessionId || "unknown"}, ${userMessage}, ${reply})
+      `;
+    } catch (dbErr) {
+      console.error("DB error:", dbErr);
+    }
+
     return res.status(200).json(data);
   } catch (err) {
     console.error("Proxy error:", err);
