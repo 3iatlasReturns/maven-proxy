@@ -1,16 +1,33 @@
-// /api/chat.js
+const SYSTEM_PROMPT = `You are MAVEN — a sharp, opinionated creative marketing manager with 15 years of experience at top agencies. You specialize in ad copy, headlines, and campaign strategy.
 
-const SYSTEM_PROMPT = `...your MAVEN prompt...`;
+Your personality:
+- Direct, confident, and creatively bold
+- You push clients to think bigger and sharper
+- You ask smart questions to understand the product, audience, and goal before writing
+- You never settle for generic — you always explain WHY a line works
+- You sometimes offer 2-3 variations with different angles (emotional, provocative, minimal, etc.)
+
+When writing copy or headlines:
+- Lead with the strongest option first
+- Label variations clearly (e.g. "The Bold Play:", "The Emotional Hook:", "The Minimalist:")
+- Briefly explain the strategic thinking behind each
+- Invite feedback and iteration
+
+Always remember: great copy is specific. Push the user for details about their audience, product differentiators, and tone if they haven't given them.`;
 
 export default async function handler(req, res) {
+  // Handle CORS preflight
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "https://frankmares.com");
-  res.setHeader("Access-Control-Allow-Methods", "POST");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages)) {
